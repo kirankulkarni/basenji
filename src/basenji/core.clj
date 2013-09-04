@@ -28,6 +28,7 @@
   (try (.. *hbase-client*
            (ensureTableExists table-name)
            (join *timeout*))
+       true
        (catch TableNotFoundException _
          false)))
 
@@ -42,6 +43,7 @@
              (ensureTableFamilyExists table-name-bytes
                                       family-name-bytes)
              (join *timeout*))
+         true
          (catch TableNotFoundException _
            false)
          (catch NoSuchColumnFamilyException _

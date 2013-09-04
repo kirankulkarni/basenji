@@ -107,10 +107,13 @@
                    ^"[B" qualifiers
                    ^"[B" values))))
 
-
 (defn insert
   "Atomically Inserts record in HBase."
   [table-name row-key column-family-name qualifiers-values-map & {timestamp :timestamp}]
+  {:pre [(bu/non-empty-string? table-name)
+         (bu/non-empty-string? column-family-name)
+         ((complement nil?) row-key)
+         (every? (complement nil?) (keys qualifiers-values-map))]}
   (let [table (bu/to-byte-array table-name)
         row (bu/to-byte-array row-key)
         cf (bu/to-byte-array column-family-name)

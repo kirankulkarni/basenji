@@ -61,3 +61,6 @@
         (aset ret i ^"[B" (first xs))
         (recur (inc i) (next xs))))
     ret))
+
+
+(def non-empty-string? (every-pred string? seq))

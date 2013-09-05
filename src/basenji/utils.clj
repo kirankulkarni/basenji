@@ -1,7 +1,8 @@
 (ns ^{:doc "Utility functions"
       :author "Kiran Kulkarni <kk@helpshift.com>"}
   basenji.utils
-  (:import [org.hbase.async Bytes]))
+  (:import [org.hbase.async Bytes]
+           [com.google.common.primitives UnsignedBytes]))
 
 
 (defprotocol IByteArray
@@ -62,3 +63,31 @@
 
 
 (def non-empty-string? (every-pred string? seq))
+
+(defmulti lenient-compare*
+  (fn [x y] [(instance? (Class/forName "[B") x)
+            (instance? (Class/forName "[B") y)]))
+
+
+(defmethod lenient-compare* [true true]
+  [x y]
+  (.compare (UnsignedBytes/lexicographicalComparator) x y))
+
+(defmethod lenient-compare* [true false]
+  [x y]
+  (.compare (UnsignedBytes/lexicographicalComparator) x (to-byte-array y)))
+
+(defmethod lenient-compare* [false true]
+  [x y]
+  (.compare (UnsignedBytes/lexicographicalComparator) x (to-byte-array y)))
+
+
+(defmethod lenient-compare* [false false]
+  [x y]
+  (compare x y))
+
+
+(defn lenient-compare
+  "Can not pass multimethod to sorted-map-by hence this fn"
+  [x y]
+  (lenient-compare* x y))

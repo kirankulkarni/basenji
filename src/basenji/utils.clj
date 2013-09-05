@@ -91,3 +91,14 @@
   "Can not pass multimethod to sorted-map-by hence this fn"
   [x y]
   (lenient-compare* x y))
+
+
+(defn sorted-assoc-in
+  "Creates nested sorted maps for assoc-in.
+   assoc-in creates hash-maps."
+  [m [k & ks] v]
+  (if ks
+    (if (get m k)
+      (assoc m k (sorted-assoc-in (get m k) ks v))
+      (assoc m k (sorted-assoc-in (sorted-map-by lenient-compare) ks v)))
+    (assoc m k v)))

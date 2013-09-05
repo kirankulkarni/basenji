@@ -24,12 +24,17 @@
      ~@forms))
 
 
+(defmacro execute
+  [& forms]
+  `(.. *hbase-client*
+       ~@forms
+       (join *timeout*)))
+
 (defn table-exists?
   "Predicate function to check whether given table exists or not"
   [^String table-name]
-  (try (.. *hbase-client*
-           (ensureTableExists table-name)
-           (join *timeout*))
+  (try (execute (ensureTableExists table-name))
+
        true
        (catch TableNotFoundException _
          false)))
@@ -41,10 +46,8 @@
   [^String table-name ^String family-name]
   (let [table-name-bytes (.getBytes table-name)
         family-name-bytes (.getBytes family-name)]
-    (try (.. *hbase-client*
-             (ensureTableFamilyExists table-name-bytes
-                                      family-name-bytes)
-             (join *timeout*))
+    (try (execute (ensureTableFamilyExists table-name-bytes
+                                   family-name-bytes))
          true
          (catch TableNotFoundException _
            false)
@@ -118,11 +121,9 @@
         row (bu/to-byte-array row-key)
         cf (bu/to-byte-array column-family-name)
         [quals vals] (coerce-qualifier-value-map qualifiers-values-map)]
-    (.. *hbase-client*
-        (atomicCreate (construct-putrequest table
-                                            row
-                                            cf
-                                            quals
-                                            vals
-                                            timestamp))
-        (join *timeout*))))
+    (execute (atomicCreate (construct-putrequest table
+                                                 row
+                                                 cf
+                                                 quals
+                                                 vals
+                                                 timestamp)))))

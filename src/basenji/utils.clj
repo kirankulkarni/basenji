@@ -46,16 +46,14 @@
                                    (pr-str s)))))
 
 
-
 (defn to-byte-array-2d
   "Shamelessly modified to-array-2d taken from Clojure Core.
   Returns a (potentially-ragged) 2-dimensional Byte array of Objects
   containing the contents of coll, which can be any Collection of
   ByteArrays"
-  {:tag "[[B;"
-   :static true}
+  ^"[[B"
   [^java.util.Collection coll]
-  (let [ret (make-array (. Class (forName "[B")) (. coll (size)))]
+  (let [ret (make-array (Class/forName "[B") (.size coll))]
     (loop [i 0 xs (seq coll)]
       (when xs
         (aset ret i ^"[B" (first xs))

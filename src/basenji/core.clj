@@ -6,7 +6,7 @@
                             TableNotFoundException
                             NoSuchColumnFamilyException
                             PutRequest GetRequest KeyValue
-                            Scanner]))
+                            Scanner DeleteRequest]))
 
 
 (def ^:dynamic *hbase-client* nil)
@@ -249,3 +249,45 @@
             (.. scanner
                 nextRows
                 (join *timeout*))))))
+
+
+
+(defn- get-delete-request
+  [table-name row-key & {:keys [family qualifiers timestamp]}]
+  (let [table (bu/to-byte-array table-name)
+        row (bu/to-byte-array row-key)]
+    (cond
+     (and (bu/non-empty-string? family)
+          (seq qualifiers)
+          (number? timestamp)
+          (pos? timestamp))
+     (DeleteRequest. table
+                     row
+                     (bu/to-byte-array family)
+                     (bu/to-byte-array-2d (mapv bu/to-byte-array
+                                                qualifiers))
+                     (long timestamp))
+     (and (bu/non-empty-string? family)
+          (seq qualifiers))
+     (DeleteRequest. table
+                     row
+                     (bu/to-byte-array family)
+                     (bu/to-byte-array-2d (mapv bu/to-byte-array
+                                                qualifiers)))
+     (bu/non-empty-string? family)
+     (DeleteRequest. table
+                     row
+                     (bu/to-byte-array family))
+     :else (DeleteRequest. table
+                           row))))
+
+
+(defn delete
+  "Deletes a row/column-family/qualifiers/value-version"
+  {:arglists `([table-name row-key {:keys [family qualifiers timestamp]}])}
+  [table-name row-key & opts]
+  (let [delete-request (apply get-delete-request
+                              table-name
+                              row-key
+                              opts)]
+    (execute (delete delete-request))))

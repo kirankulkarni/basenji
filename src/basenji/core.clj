@@ -111,8 +111,8 @@
                    ^"[B" qualifiers
                    ^"[B" values))))
 
-(defn insert
-  "Atomically Inserts record in HBase."
+(defn put
+  "Atomically puts record in HBase."
   [table-name row-key column-family-name qualifiers-values-map & {timestamp :timestamp}]
   {:pre [(bu/non-empty-string? table-name)
          (bu/non-empty-string? column-family-name)

@@ -63,6 +63,7 @@
 
 
 (def non-empty-string? (every-pred string? seq))
+(def not-nil? (complement nil?))
 
 (defmulti lenient-compare*
   (fn [x y] [(instance? (Class/forName "[B") x)
@@ -102,3 +103,14 @@
       (assoc m k (sorted-assoc-in (get m k) ks v))
       (assoc m k (sorted-assoc-in (sorted-map-by lenient-compare) ks v)))
     (assoc m k v)))
+
+
+(defmacro doto-cond->
+  [x & clauses]
+  (let [gx (gensym)]
+    `(let [~gx ~x]
+       ~@(map (fn [[test f]]
+                `(when ~test
+                   (-> ~gx ~f)))
+              (partition 2 clauses))
+       ~gx)))

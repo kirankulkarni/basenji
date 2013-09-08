@@ -5,7 +5,8 @@
   (:import [org.hbase.async HBaseClient ClientStats
                             TableNotFoundException
                             NoSuchColumnFamilyException
-                            PutRequest GetRequest KeyValue]))
+                            PutRequest GetRequest KeyValue
+                            Scanner]))
 
 
 (def ^:dynamic *hbase-client* nil)
@@ -173,3 +174,78 @@
                  :row-fn row-fn
                  :qual-fn qual-fn
                  :val-fn val-fn)))
+
+
+(defn- get-scanner
+  "Given a table name and options returns scanner.
+   It mutates scanner object to set given options"
+  [table-name {:keys [start-row stop-row
+                      family qualifiers
+                      min-timestamp max-timestamp]}]
+  (bu/doto-cond-> (.newScanner *hbase-client* table-name)
+                  (bu/not-nil? start-row) (.setStartKey (bu/to-byte-array start-row))
+                  (bu/not-nil? stop-row) (.setStopKey (bu/to-byte-array stop-row))
+                  (bu/non-empty-string? family) (.setFamily family)
+                  (and (bu/non-empty-string? family)
+                       (seq qualifiers)) (.setQualifiers
+                                          (bu/to-byte-array-2d (mapv bu/to-byte-array
+                                                  qualifiers)))
+                  (and (number? min-timestamp)
+                       (pos? min-timestamp)) (.setTimeRange min-timestamp Long/MAX_VALUE)
+                  (and (number? max-timestamp)
+                       (pos? max-timestamp)) (.setTimeRange Long/MIN_VALUE max-timestamp)
+                  (and (number? min-timestamp)
+                       (number? max-timestamp)
+                       (pos? min-timestamp)
+                       (pos? max-timestamp)
+                       (< min-timestamp max-timestamp)) (.setTimeRange min-timestamp max-timestamp)))
+
+
+(defn scan
+  "Scans the given table.
+   Takes following Optional Arguments
+
+   Scan Params:
+   start-row  - Start Row for the scan (Inclusive)
+   stop-row   - Stop Row for the scan (Exclusive)
+   family     - Column Family to scan
+   qualifiers - List of qualifiers to scan and return
+   min-timestamp - All values equal to and above this will be returned (Inclusive)
+   max-timestamp - All values below this will be returned (Exclusive)
+
+   row-fn - Function that will be applied to row-key bytes
+   qual-fn - Function that will be applied to qualifier bytes
+   val-fn - Function that will be applied to value bytes
+   lazy? - Returns a lazy sequence from scan (Default: true)"
+  [table-name & {:keys [start-row stop-row
+                        family qualifiers
+                        min-timesamp max-timestamp
+                        row-fn qual-fn val-fn
+                        lazy?]
+                 :or {row-fn identity
+                      qual-fn identity
+                      val-fn identity
+                      lazy? true}
+                 :as opts}]
+  (let [scanner (get-scanner table-name opts)
+        lazy-fn (fn lazy-fn [scanner]
+                  (lazy-seq
+                   (let [row (first
+                              (.. scanner
+                                  (nextRows 1)
+                                  (join *timeout*)))]
+                     (when row
+                       (cons (process-row row
+                                          :row-fn row-fn
+                                          :qual-fn qual-fn
+                                          :val-fn val-fn)
+                             (lazy-fn scanner))))))]
+    (if lazy?
+      (lazy-fn scanner)
+      (mapv #(process-row %
+                          :row-fn row-fn
+                          :qual-fn qual-fn
+                          :val-fn val-fn)
+            (.. scanner
+                nextRows
+                (join *timeout*))))))

@@ -5,7 +5,7 @@
   (:import [org.hbase.async HBaseClient ClientStats
                             TableNotFoundException
                             NoSuchColumnFamilyException
-                            PutRequest]))
+                            PutRequest GetRequest KeyValue]))
 
 
 (def ^:dynamic *hbase-client* nil)
@@ -30,11 +30,11 @@
        ~@forms
        (join *timeout*)))
 
+
 (defn table-exists?
   "Predicate function to check whether given table exists or not"
   [^String table-name]
   (try (execute (ensureTableExists table-name))
-
        true
        (catch TableNotFoundException _
          false)))
@@ -127,3 +127,49 @@
                                                  quals
                                                  vals
                                                  timestamp)))))
+
+
+(defn- extract-keyvalue-info
+  [^KeyValue kv row-fn qual-fn val-fn]
+  {:row (row-fn (.key kv))
+   :qualifier (qual-fn (.qualifier kv))
+   :value (val-fn (.value kv))
+   :timestamp (.timestamp kv)})
+
+
+(defn process-row
+  [keyvalues & {:keys [row-fn qual-fn val-fn]
+                :or {row-fn identity
+                     qual-fn identity
+                     val-fn identity}}]
+  (reduce (fn [agg {:keys [row qualifier value timestamp]}]
+            (bu/sorted-assoc-in agg [row qualifier timestamp] value))
+          (sorted-map-by bu/lenient-compare)
+          (map #(extract-keyvalue-info %
+                                       row-fn
+                                       qual-fn
+                                       val-fn)
+               keyvalues)))
+
+
+(defn get-row
+  "Get a row from HBase
+   takes a table-name and row-key
+   Also some functions which will be used for processing result
+   row-fn - Will be appled to row-key bytes
+   qual-fn - Will be applied to qualifier bytes
+   val-fn - Will be applied to value bytes"
+  [table-name row-key & {:keys [row-fn qual-fn val-fn]
+                         :or {row-fn identity
+                              qual-fn identity
+                              val-fn identity}}]
+  {:pre [(bu/non-empty-string? table-name)
+         ((complement nil?) row-key)]}
+  (let [row (bu/to-byte-array row-key)
+        get-request (GetRequest. ^String table-name
+                                 ^"[B" row)
+        keyvals (execute (get get-request))]
+    (process-row keyvals
+                 :row-fn row-fn
+                 :qual-fn qual-fn
+                 :val-fn val-fn)))

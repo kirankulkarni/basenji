@@ -26,8 +26,8 @@
 
 
 (defmacro execute
-  [& forms]
-  `(.. *hbase-client*
+  [object & forms]
+  `(.. ~object
        ~@forms
        (join *timeout*)))
 
@@ -35,7 +35,7 @@
 (defn table-exists?
   "Predicate function to check whether given table exists or not"
   [^String table-name]
-  (try (execute (ensureTableExists table-name))
+  (try (execute *hbase-client* (ensureTableExists table-name))
        true
        (catch TableNotFoundException _
          false)))
@@ -47,8 +47,9 @@
   [^String table-name ^String family-name]
   (let [table-name-bytes (.getBytes table-name)
         family-name-bytes (.getBytes family-name)]
-    (try (execute (ensureTableFamilyExists table-name-bytes
-                                   family-name-bytes))
+    (try (execute *hbase-client*
+                  (ensureTableFamilyExists table-name-bytes
+                                           family-name-bytes))
          true
          (catch TableNotFoundException _
            false)
@@ -122,7 +123,8 @@
         row (bu/to-byte-array row-key)
         cf (bu/to-byte-array column-family-name)
         [quals vals] (coerce-qualifier-value-map qualifiers-values-map)]
-    (execute (atomicCreate (construct-putrequest table
+    (execute *hbase-client*
+             (atomicCreate (construct-putrequest table
                                                  row
                                                  cf
                                                  quals
@@ -169,7 +171,8 @@
   (let [row (bu/to-byte-array row-key)
         get-request (GetRequest. ^String table-name
                                  ^"[B" row)
-        keyvals (execute (get get-request))]
+        keyvals (execute *hbase-client*
+                         (get get-request))]
     (process-row keyvals
                  :row-fn row-fn
                  :qual-fn qual-fn
@@ -231,9 +234,8 @@
         lazy-fn (fn lazy-fn [scanner]
                   (lazy-seq
                    (let [row (first
-                              (.. scanner
-                                  (nextRows 1)
-                                  (join *timeout*)))]
+                              (execute scanner
+                                       (nextRows 1)))]
                      (when row
                        (cons (process-row row
                                           :row-fn row-fn
@@ -246,9 +248,8 @@
                           :row-fn row-fn
                           :qual-fn qual-fn
                           :val-fn val-fn)
-            (.. scanner
-                nextRows
-                (join *timeout*))))))
+            (execute scanner
+                     nextRows)))))
 
 
 
@@ -290,11 +291,12 @@
                               table-name
                               row-key
                               opts)]
-    (execute (delete delete-request))))
+    (execute *hbase-client*
+             (delete delete-request))))
 
 
 
 (defn flush
   "Flushes to HBase any buffered client-side operation"
   []
-  (execute flush))
+  (execute *hbase-client* flush))

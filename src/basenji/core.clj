@@ -291,3 +291,10 @@
                               row-key
                               opts)]
     (execute (delete delete-request))))
+
+
+
+(defn flush
+  "Flushes to HBase any buffered client-side operation"
+  []
+  (execute flush))

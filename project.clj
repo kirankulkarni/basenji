@@ -1,4 +1,4 @@
-(defproject net.kirankulkarni/basenji "0.1.1-SNAPSHOT"
+(defproject net.kirankulkarni/basenji "0.1.1"
   :description "A HBase Clojure Client library"
   :url "https://github.com/kirankulkarni/basenji"
   :license {:name "Eclipse Public License"

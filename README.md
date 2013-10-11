@@ -6,7 +6,10 @@ There is another client library [clojure-hbase](https://github.com/davidsantiago
 
 Currently Basenji is under development and is *not* production ready.
 ## Installation
-TBD
+Leiningen users include following line in your project.clj
+```clojure
+[net.kirankulkarni/basenji "0.1.1"]
+```
 
 ## Getting Started
 

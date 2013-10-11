@@ -223,30 +223,33 @@
    val-fn - Function that will be applied to value bytes
    lazy? - Returns a lazy sequence from scan (Default: true)
    limit - Returns these many rows from a scan, used when lazy? is false
-           (Default: 128)"
+           (Default: 128)
+   chunk-size - When you are using lazy, chunk of 128 rows will be fetched
+                If you want to increase this limit use chunk-size"
   [table-name & {:keys [start-row stop-row
                         family qualifiers
                         min-timesamp max-timestamp
                         row-fn qual-fn val-fn
-                        lazy? limit]
+                        lazy? limit chunk-size]
                  :or {row-fn identity
                       qual-fn identity
                       val-fn identity
                       lazy? true
+                      chunk-size 128
                       limit 128}
                  :as opts}]
   (let [scanner (get-scanner table-name opts)
         lazy-fn (fn lazy-fn [scanner]
                   (lazy-seq
-                   (let [row (first
-                              (execute scanner
-                                       (nextRows 1)))]
-                     (when row
-                       (cons (process-row row
-                                          :row-fn row-fn
-                                          :qual-fn qual-fn
-                                          :val-fn val-fn)
-                             (lazy-fn scanner))))))]
+                   (let [rows (execute scanner
+                                       (nextRows chunk-size))]
+                     (when rows
+                       (concat (map #(process-row %
+                                                  :row-fn row-fn
+                                                  :qual-fn qual-fn
+                                                  :val-fn val-fn)
+                                    rows)
+                               (lazy-fn scanner))))))]
     (if lazy?
       (lazy-fn scanner)
       (mapv #(process-row %

@@ -182,8 +182,8 @@
 (defn- get-scanner
   "Given a table name and options returns scanner.
    It mutates scanner object to set given options"
-  [table-name {:keys [start-row stop-row
-                      family qualifiers
+  [table-name {:keys [start-row stop-row lazy?
+                      family qualifiers limit
                       min-timestamp max-timestamp]}]
   (bu/doto-cond-> (.newScanner *hbase-client* table-name)
                   (bu/not-nil? start-row) (.setStartKey (bu/to-byte-array start-row))
@@ -201,7 +201,9 @@
                        (number? max-timestamp)
                        (pos? min-timestamp)
                        (pos? max-timestamp)
-                       (< min-timestamp max-timestamp)) (.setTimeRange min-timestamp max-timestamp)))
+                       (< min-timestamp max-timestamp)) (.setTimeRange min-timestamp max-timestamp)
+                  (and (number? limit)
+                       (not lazy?)) (.setMaxNumRows limit)))
 
 
 (defn scan
@@ -219,16 +221,19 @@
    row-fn - Function that will be applied to row-key bytes
    qual-fn - Function that will be applied to qualifier bytes
    val-fn - Function that will be applied to value bytes
-   lazy? - Returns a lazy sequence from scan (Default: true)"
+   lazy? - Returns a lazy sequence from scan (Default: true)
+   limit - Returns these many rows from a scan, used when lazy? is false
+           (Default: 128)"
   [table-name & {:keys [start-row stop-row
                         family qualifiers
                         min-timesamp max-timestamp
                         row-fn qual-fn val-fn
-                        lazy?]
+                        lazy? limit]
                  :or {row-fn identity
                       qual-fn identity
                       val-fn identity
-                      lazy? true}
+                      lazy? true
+                      limit 128}
                  :as opts}]
   (let [scanner (get-scanner table-name opts)
         lazy-fn (fn lazy-fn [scanner]
